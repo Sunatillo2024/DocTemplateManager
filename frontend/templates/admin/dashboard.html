@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Админ-панель{% endblock %}
+{% block content %}
+<h1>Административная панель</h1>
+
+<div class="stats-grid" id="stats-container">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-templates">...</div>
+    <div class="stat-label">Всего шаблонов</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-users">...</div>
+    <div class="stat-label">Пользователей</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-docs-month">...</div>
+    <div class="stat-label">Документов за месяц</div>
+  </div>
+</div>
+
+<div style="margin-top: 20px;">
+  <a href="{% url 'admin-templates' %}" class="btn btn-primary">Управление шаблонами</a>
+  <a href="{% url 'admin-users' %}" class="btn btn-outline">Управление пользователями</a>
+</div>
+
+<script>
+async function loadStats() {
+  try {
+    // So‘rovlarga ?page_size=1000 qo‘shib barcha yozuvlarni olamiz
+    const [templatesRes, usersRes, docsRes] = await Promise.all([
+      apiRequest('/api/admin/templates/?page_size=1000'),
+      apiRequest('/api/admin/users/?page_size=1000'),
+      apiRequest('/api/documents/?page_size=1000')
+    ]);
+
+    const templatesData = await templatesRes.json();
+    const usersData = await usersRes.json();
+    const docsData = await docsRes.json();
+
+    // API javobi endi { success: true, data: [...] } formatida
+    const templates = templatesData.data || templatesData;
+    const users = usersData.data || usersData;
+    const docs = docsData.data || docsData;
+
+    const totalTemplates = templates.length;
+    const totalUsers = users.length;
+
+    // Shu oy boshidan keyingi hujjatlar
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const docsThisMonth = docs.filter(d => new Date(d.created_at) >= monthStart).length;
+
+    document.getElementById('stat-templates').textContent = totalTemplates;
+    document.getElementById('stat-users').textContent = totalUsers;
+    document.getElementById('stat-docs-month').textContent = docsThisMonth;
+  } catch (e) {
+    document.querySelectorAll('.stat-value').forEach(el => el.textContent = '—');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadStats);
+</script>
+{% endblock %}

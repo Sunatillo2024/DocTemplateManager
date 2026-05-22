@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Главная — Шаблоны{% endblock %}
+{% block content %}
+<h1>Доступные шаблоны</h1>
+
+<div class="search-bar">
+  <input type="search" id="search-input" placeholder="Поиск по названию..." autocomplete="off">
+  <button class="btn btn-primary" id="search-btn">Найти</button>
+</div>
+
+<div id="templates-container">
+  <div class="card-grid" id="template-cards"></div>
+  <p id="loading-msg" style="text-align:center;display:none;">Загрузка...</p>
+  <p id="empty-msg" style="text-align:center;display:none;">Шаблоны не найдены</p>
+</div>
+
+<script>
+let currentQuery = '';
+
+// Загрузка шаблонов с сервера
+async function loadTemplates(query = '') {
+  const cards = document.getElementById('template-cards');
+  const loading = document.getElementById('loading-msg');
+  const empty = document.getElementById('empty-msg');
+
+  cards.innerHTML = '';
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+
+  try {
+    const res = await apiRequest(`/api/templates/?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    // Предполагаем структуру ответа: { success: true, data: [...] } или просто [...]
+    const templates = data.data || data;
+
+    loading.style.display = 'none';
+
+    if (templates.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+
+    templates.forEach(tpl => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h3 class="card-title">${escapeHtml(tpl.title)}</h3>
+        <p class="card-desc">${escapeHtml(tpl.description || '')}</p>
+        <div class="card-meta">
+          <span>📄 ${tpl.file_type?.toUpperCase()}</span>
+          <span>🔖 Плейсхолдеров: ${tpl.placeholder_count ?? tpl.placeholders?.length ?? 0}</span>
+        </div>
+        <div class="card-actions">
+          <a href="/fill/${tpl.id}/" class="btn btn-primary">Заполнить</a>
+        </div>
+      `;
+      cards.appendChild(card);
+    });
+  } catch (e) {
+    loading.style.display = 'none';
+    empty.style.display = 'block';
+    empty.textContent = 'Ошибка загрузки шаблонов';
+  }
+}
+
+// Простая защита от XSS
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Поиск с задержкой (debounce)
+let debounceTimer;
+document.getElementById('search-input').addEventListener('input', (e) => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    currentQuery = e.target.value.trim();
+    loadTemplates(currentQuery);
+  }, 300);
+});
+
+document.getElementById('search-btn').addEventListener('click', () => {
+  currentQuery = document.getElementById('search-input').value.trim();
+  loadTemplates(currentQuery);
+});
+
+// Загрузка при открытии страницы
+document.addEventListener('DOMContentLoaded', () => {
+  loadTemplates(currentQuery);
+});
+</script>
+{% endblock %}

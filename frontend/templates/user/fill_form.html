@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block title %}Заполнить шаблон{% endblock %}
+{% block content %}
+<h1 id="template-title">Загрузка...</h1>
+<p id="template-desc" style="color: var(--gray-500);"></p>
+
+<div id="fill-container">
+  <form id="fill-form" onsubmit="handleSubmit(event)">
+    <!-- динамические поля -->
+  </form>
+  <div style="margin-top: 20px;">
+    <label style="font-weight:500;">Формат файла:</label>
+    <div class="format-toggle" id="format-toggle">
+      <button type="button" data-format="pdf" class="active">PDF</button>
+      <button type="button" data-format="docx">DOCX</button>
+    </div>
+  </div>
+  <button type="submit" form="fill-form" class="btn btn-accent" id="submit-btn" style="margin-top: 24px;">
+    Скачать документ
+  </button>
+  <div id="spinner-container" style="display:none; margin-top: 10px;">
+    <span class="spinner spinner-large"></span> Генерация документа...
+  </div>
+</div>
+
+<script>
+const pathParts = window.location.pathname.split('/');
+const templateId = pathParts[pathParts.indexOf('fill') + 1];
+let selectedFormat = 'pdf';
+
+// Переключатель формата
+document.getElementById('format-toggle').addEventListener('click', (e) => {
+  if (e.target.tagName === 'BUTTON') {
+    document.querySelectorAll('#format-toggle button').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    selectedFormat = e.target.dataset.format;
+  }
+});
+
+// Загрузка информации о шаблоне и создание формы
+async function init() {
+  try {
+    const res = await apiRequest(`/api/templates/${templateId}/`);
+    const data = await res.json();
+    const tpl = data.data || data; // структура ответа
+
+    document.getElementById('template-title').textContent = tpl.title || 'Шаблон';
+    document.getElementById('template-desc').textContent = tpl.description || '';
+
+    const form = document.getElementById('fill-form');
+    const placeholders = tpl.placeholders || [];
+
+    if (placeholders.length === 0) {
+      form.innerHTML = '<p>В этом шаблоне нет плейсхолдеров.</p>';
+      return;
+    }
+
+    placeholders.forEach(ph => {
+      const group = document.createElement('div');
+      group.className = 'form-group';
+
+      const label = document.createElement('label');
+      label.textContent = formatLabel(ph);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.name = ph;
+      input.placeholder = `Введите ${formatLabel(ph)}`;
+      input.required = true;
+
+      group.appendChild(label);
+      group.appendChild(input);
+      form.appendChild(group);
+    });
+  } catch (e) {
+    document.getElementById('template-title').textContent = 'Ошибка загрузки шаблона';
+    document.getElementById('fill-form').innerHTML = '<p>Не удалось загрузить данные. Возможно, шаблон не существует.</p>';
+  }
+}
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const spinner = document.getElementById('spinner-container');
+
+  btn.disabled = true;
+  btn.style.display = 'none';
+  spinner.style.display = 'block';
+
+  const formData = new FormData(e.target);
+  const filledData = {};
+  formData.forEach((value, key) => {
+    filledData[key] = value;
+  });
+
+  try {
+    const res = await apiRequest(`/api/templates/${templateId}/fill/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        filled_data: filledData,
+        output_format: selectedFormat
+      })
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `document.${selectedFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Документ успешно сгенерирован', 'success');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Ошибка при генерации файла', 'error');
+    }
+  } catch (e) {
+    // ошибка уже показана через apiRequest
+  } finally {
+    btn.disabled = false;
+    btn.style.display = '';
+    spinner.style.display = 'none';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

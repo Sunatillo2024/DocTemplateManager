@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<div class="auth-form">
+  <h2>Вход в систему</h2>
+  <form id="login-form" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" placeholder="Введите email" required autofocus>
+    </div>
+    <div class="form-group">
+      <label for="password">Пароль</label>
+      <input type="password" id="password" name="password" placeholder="Введите пароль" required>
+    </div>
+    <button type="submit" class="btn btn-primary" id="login-btn">Войти</button>
+    <p class="auth-link">Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a></p>
+  </form>
+</div>
+
+<script>
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = 'Загрузка... <span class="spinner"></span>';
+
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+
+  try {
+    const res = await apiRequest('/api/auth/login/', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Вход выполнен', 'success');
+      // Сохраняем токен в localStorage (если нужно для API)
+      if (data.data.token) {
+        localStorage.setItem('auth_token', data.data.token);
+      }
+      // Перенаправляем на дашборд
+      window.location.href = '/';
+    }
+  } catch(err) {
+    // ошибка уже показана в apiRequest
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Войти';
+  }
+}
+</script>
+
+<style>
+.auth-form {
+  max-width: 400px;
+  margin: 60px auto;
+  background: var(--white);
+  padding: 40px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.auth-form h2 {
+  margin-bottom: 20px;
+  text-align: center;
+}
+.auth-link {
+  text-align: center;
+  margin-top: 15px;
+}
+</style>
+{% endblock %}

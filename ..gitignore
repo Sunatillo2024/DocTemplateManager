@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+.env
+
+# Базы данных и медиа
+*.sqlite3
+/media/
+/staticfiles/
+
+# Временные файлы
+/tmp/
+*.log
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Системные файлы Windows
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Шаблон — {% if template_id %}Редактирование{% else %}Создание{% endif %}{% endblock %}
+{% block content %}
+<h1 id="form-title">Загрузка шаблона</h1>
+
+<form id="template-form" onsubmit="handleSubmit(event)">
+  <div class="form-group">
+    <label for="title">Название *</label>
+    <input type="text" id="title" name="title" required placeholder="Название шаблона">
+  </div>
+  <div class="form-group">
+    <label for="description">Описание</label>
+    <textarea id="description" name="description" rows="3" placeholder="Краткое описание"></textarea>
+  </div>
+  <div class="form-group">
+    <label for="file">Файл (.docx, .doc, макс. 10 МБ)</label>
+    <input type="file" id="file" name="file" accept=".docx,.doc">
+    <small id="current-file" style="display:none; color: var(--gray-500);">Текущий файл: </small>
+  </div>
+  <div class="form-row">
+    <button type="submit" class="btn btn-accent" id="submit-btn">Сохранить</button>
+    <a href="{% url 'admin-templates' %}" class="btn btn-outline">Отмена</a>
+  </div>
+  <div id="spinner-container" style="display:none; margin-top: 10px;">
+    <span class="spinner spinner-large"></span> Сохранение...
+  </div>
+</form>
+
+<script>
+const pathParts = window.location.pathname.split('/');
+const editIndex = pathParts.indexOf('edit');
+const templateId = editIndex > 0 ? pathParts[editIndex - 1] : null;
+const isEdit = !!templateId;
+
+// Настройка страницы
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('form-title').textContent = isEdit ? 'Редактирование шаблона' : 'Загрузка нового шаблона';
+  if (!isEdit) {
+    document.getElementById('file').required = true;
+  } else {
+    loadTemplateData();
+  }
+});
+
+// Загрузка данных шаблона для редактирования
+async function loadTemplateData() {
+  try {
+    const res = await apiRequest(`/api/admin/templates/${templateId}/`);
+    const data = await res.json();
+    const tpl = data.data || data;
+    document.getElementById('title').value = tpl.title || '';
+    document.getElementById('description').value = tpl.description || '';
+    if (tpl.file) {
+      const current = document.getElementById('current-file');
+      current.textContent = 'Текущий файл: ' + (tpl.file.split('/').pop() || 'загружен');
+      current.style.display = 'block';
+    }
+  } catch (e) {
+    showToast('Ошибка загрузки шаблона', 'error');
+  }
+}
+
+// Отправка формы (используем FormData, т.к. файл)
+async function handleSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const spinner = document.getElementById('spinner-container');
+
+  btn.disabled = true;
+  spinner.style.display = 'block';
+
+  const form = e.target;
+  const formData = new FormData(form);
+  // При редактировании метод PUT, при создании POST
+  const method = isEdit ? 'PUT' : 'POST';
+  const url = isEdit ? `/api/admin/templates/${templateId}/` : '/api/admin/templates/';
+
+  try {
+    const res = await fetch(url, {
+      method: method,
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: formData,
+    });
+
+    if (res.ok) {
+      showToast(isEdit ? 'Шаблон обновлён' : 'Шаблон успешно загружен', 'success');
+      setTimeout(() => { window.location.href = '{% url "admin-templates" %}'; }, 1000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || err.detail || 'Ошибка сохранения', 'error');
+    }
+  } catch (err) {
+    showToast('Нет соединения с сервером', 'error');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+</script>
+{% endblock %}
